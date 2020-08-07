@@ -153,28 +153,31 @@ spec:
       tls: # (8)
         cert: <mounted tls certificate>
         version: TLS_1.3
-      authentication: (9)
-        type: [oauth/basic/...]
-        tokenServer: # for oauth
-          host: # where the server is
-          registrationPath: # where to register OIDC endpoints and get clientId/secret
-          tokenPath: # where to exchange oauth dance for token
-
+      authentication: # (9)
+          host: 'https://route-to-provider:port'
+          type: <provider type> # (9.1)
+          registrationPath: '/oidc' # (9.2)
+          tokenPath: '/token' # (9.3)
+          basicAuthPath: '/user' # (9.4)
 
 ...
 ```
 
 Where:
 
-1. Optional, certificate used between client and UI server. If omitted, UI server will serve via http rather than https.
-2. Required, string - the name of this cluster. Should be the same value as `metadata.name` in the Kafka CR.
-3. Optional, a config map containing JSON. If provided, values in this config map will override default configuration values.
-4. Required, string - a unique identifier of this 'backend'.
-5. Required, string - the type of this 'backend' - so we can have subtypes for admin etc.
-6. Required, string - endpoint address for this backend.
-7. Required, integer - the version of the API this UI will use.
-8. Optional, object. Contains tls configuration (certificate to use, protocol versions etc. If omitted, traffic between these two endpoints will be in the clear.
-9. Optional, object. Contains authentication (for type `admin`) - how user can log in, how credentials are sent to the backend. If omitted, that cluster will not have a log in mechanism.
+1.  Optional, certificate used between client and UI server. If omitted, UI server will serve via http rather than https.
+2.  Required, string - the name of this cluster. Should be the same value as `metadata.name` in the Kafka CR.
+3.  Optional, a config map containing JSON. If provided, values in this config map will override default configuration values.
+4.  Required, string - a unique identifier of this 'backend'.
+5.  Required, string - the type of this 'backend' - so we can have subtypes for admin etc.
+6.  Required, string - endpoint address for this backend.
+7.  Required, integer - the version of the API this UI will use.
+8.  Optional, object. Contains tls configuration (certificate to use, protocol versions etc. If omitted, traffic between these two endpoints will be in the clear.
+9.  Optional, object. Contains autherntication configuration for the UI to allow a user to login and view that backend
+    1. Required, string - the type of authentication that this 'backend' supports (bearer token, basic auth)
+    2. Optional, string - depending on authentication type, UI may need to register OIDC callback urls and generate a client id/secret
+    3. Optional, string - path to use for token exchange (bearer)
+    4. Optional, string - depending on authentication type (basic), UI may need to render own login screen and then POST to validate user/password
 
 I am suggesting this approach for the following reasons:
 
