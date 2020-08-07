@@ -68,7 +68,7 @@ In order to provide any UI, the whole stack which will support it will need to b
 - A Kafka backend server for Kafka data/requests the UI server can call
 - UI server configurability/capability - including aspects such as;
   - Transport security
-  - User session, authentication and authorization capabilities
+  - [User session, authentication and authorization capabilities](#session-management-and-authentication))
   - Cluster metadata - listener addresses, number of brokers, etc
   - Maintenance/tracing support
 - UI client side capabilities
@@ -147,11 +147,20 @@ spec:
     uiConfig: <mounted config map> # (3)
     backend:
     - name: 'strimzi-api' # (4)
-      address: 'https://route-to-strimzi-api-for-dev-cluster:port' # (5)
-      version: 1 # (6)
-      tls: # 7
+      type: [admin/...] # specific type to identify admin server?  # (5)
+      address: 'https://route-to-strimzi-api-for-dev-cluster:port' # (6)
+      version: 1 # (7)
+      tls: # (8)
         cert: <mounted tls certificate>
         version: TLS_1.3
+      authentication: (9)
+        type: [oauth/basic/...]
+        tokenServer: # for oauth
+          host: # where the server is
+          registrationPath: # where to register OIDC endpoints and get clientId/secret
+          tokenPath: # where to exchange oauth dance for token
+
+
 ...
 ```
 
@@ -161,9 +170,11 @@ Where:
 2. Required, string - the name of this cluster. Should be the same value as `metadata.name` in the Kafka CR.
 3. Optional, a config map containing JSON. If provided, values in this config map will override default configuration values.
 4. Required, string - a unique identifier of this 'backend'.
-5. Required, string - endpoint address for this backend.
-6. Required, integer - the version of the API this UI will use.
-7. Optional, object. Contains tls configuration (certificate to use, protocol versions etc. If omitted, traffic between these two endpoints will be in the clear.
+5. Required, string - the type of this 'backend' - so we can have subtypes for admin etc.
+6. Required, string - endpoint address for this backend.
+7. Required, integer - the version of the API this UI will use.
+8. Optional, object. Contains tls configuration (certificate to use, protocol versions etc. If omitted, traffic between these two endpoints will be in the clear.
+9. Optional, object. Contains authentication (for type `admin`) - how user can log in, how credentials are sent to the backend. If omitted, that cluster will not have a log in mechanism.
 
 I am suggesting this approach for the following reasons:
 
@@ -195,7 +206,7 @@ This session must be shared between HTTP and WebSocket traffic – as the UI wil
 
 ![UI session component architecture](./images/009-session-architecture.png)
 
-- Admin – Graphql server, supporting HTTP and websocket connections
+- Admin – Graphql server, supporting HTTP and websocket connections [admin server proposal](https://github.com/strimzi/proposals/pull/9)
 - Express – UI server, handling sessions for the client
 - Client – Browser running the strimzi UI, executing graphql queries/subscriptions
 - Kafka – brokers (connected to via admin clients)
@@ -203,7 +214,7 @@ This session must be shared between HTTP and WebSocket traffic – as the UI wil
 
 ### Proposed technology:
 
-The UI is being hosted by an Express server. Express has session middleware - https://www.npmjs.com/package/express-session - that can create and persist server-side sessions, using a cookie as a key to hydrate a session into the incoming express request.
+The UI is being hosted by an Express server. Express has session middleware - https://www.npmjs.com/package/express-session - that can create and persist server-side sessions, using a cookie as a key to hydrate a session into the incoming express request. Proposed session store is a `redis` contianer as it's a lightweight key/value (and the session will just be storing a token value).
 
 Authentication in node/Express can be achieved through by http://www.passportjs.org/ which provides a large collection of “strategies” for authenticating a user. This can include oidc flows for a UI oauth dance.
 
